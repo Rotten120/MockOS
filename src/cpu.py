@@ -1,8 +1,8 @@
 import asyncio
 import time
-from .clock import Clock
+from .clock import Clock, clock_sync_loop
 
-class CPU(Clock):
+class CPU:
     sw_time = 0.1
 
     def __init__(self, rq, overhead = False):
@@ -28,7 +28,7 @@ class CPU(Clock):
         if self.overhead:
             await asyncio.sleep(CPU.sw_time)
         self.job = job
-        print(f"Allocated \"{self.job.name}\" [{self.elapsed()}]")
+        print(f"Allocated \"{self.job.name}\" [{Clock.elapsed()}]")
 
     async def dealloc(self):
         if self.is_idle():
@@ -37,7 +37,7 @@ class CPU(Clock):
             await asyncio.sleep(CPU.sw_time)
         if round(self.job.remaining, 2) > 0:
             await self.rq.enqueue(self.job)
-        print(f"Deallocated \"{self.job.name}\" [{self.elapsed()}]")
+        print(f"Deallocated \"{self.job.name}\" [{Clock.elapsed()}]")
         self.job = None
 
     async def execute(self):
@@ -46,21 +46,20 @@ class CPU(Clock):
             if self._interrupted:
                 raise TimeoutError()
 
+    @clock_sync_loop(interval = 0)
     async def run(self, quantum = None):
-        while True:
-            await asyncio.sleep(0)
-            if self.is_idle():
-                continue
-            start_time = time.time()
+        if self.is_idle():
+            return
+        start_time = time.time()
 
-            try:
-                await asyncio.gather(
-                    self.execute(),
-                    self.set_proc_time(quantum)
-                )
-            except TimeoutError:
-                self._interrupted = False
+        try:
+            await asyncio.gather(
+                self.execute(),
+                self.set_proc_time(quantum)
+            )
+        except TimeoutError:
+            self._interrupted = False
             
-            duration = time.time() - start_time
-            self.job.remaining -= duration
-            await self.dealloc()
+        duration = time.time() - start_time
+        self.job.remaining -= duration
+        await self.dealloc()

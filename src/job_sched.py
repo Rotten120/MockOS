@@ -2,7 +2,7 @@ from .clock import Clock
 import asyncio
 import itertools
 
-class JobScheduler(Clock):
+class JobScheduler:
     counter = itertools.count()
     def __init__(self, jobs, rq):    
         self._tjobs = sorted(jobs, key = lambda j: j.arrival)
@@ -15,5 +15,5 @@ class JobScheduler(Clock):
     async def load(self, job):
         await asyncio.sleep(job.arrival)
         await self.rq.enqueue(next(JobScheduler.counter), job)
-        print(f"Loaded \"{job.name}\" [{self.elapsed()}]")
+        print(f"Loaded \"{job.name}\" [{Clock.elapsed()}]")
 
