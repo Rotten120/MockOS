@@ -8,11 +8,14 @@ class CPU:
     def __init__(self, rq, overhead = False):
         self.job = None
         self.rq = rq
-        self._interrupted = False
+        self.interrupted = False
         self.overhead = overhead
 
     def interrupt(self):
-        self._interrupted = True
+        self.interrupted = True
+
+    def is_interrupted(self):
+        return self.interrupted
 
     async def set_proc_time(self, quantum = None):
         await asyncio.sleep(quantum or self.job.remaining)
@@ -35,31 +38,37 @@ class CPU:
             raise ValueError("CPU is already idle")
         if self.overhead:
             await asyncio.sleep(CPU.sw_time)
-        if round(self.job.remaining, 2) > 0:
+
+        if self.job.remaining > 0:
             await self.rq.enqueue(self.job)
-        print(f"Deallocated \"{self.job.name}\" [{Clock.elapsed()}]")
+            print(f"Deallocated \"{self.job.name}\" [{Clock.elapsed()}]")
+        else:
+            print(f"Remove \"{self.job.name}\" [{Clock.elapsed()}]")
+        
         self.job = None
 
+    @clock_sync_loop(interval = 0)
     async def execute(self):
-        while True:
-            await asyncio.sleep(0)
-            if self._interrupted:
-                raise TimeoutError()
+        if self.interrupted:
+            raise TimeoutError()
 
     @clock_sync_loop(interval = 0)
     async def run(self, quantum = None):
         if self.is_idle():
             return
-        start_time = time.time()
 
+        start_time = time.time()
         try:
-            await asyncio.gather(
-                self.execute(),
-                self.set_proc_time(quantum)
-            )
+            t1 = asyncio.create_task(self.execute())
+            t2 = asyncio.create_task(self.set_proc_time(quantum))
+            group = asyncio.gather(t1, t2)
+            await group
         except TimeoutError:
-            self._interrupted = False
-            
+            t1.cancel()
+            t2.cancel()
+            group.cancel()    
+
         duration = time.time() - start_time
-        self.job.remaining -= duration
+        self.job.remaining -= round(duration, 2)
         await self.dealloc()
+        self.interrupted = False

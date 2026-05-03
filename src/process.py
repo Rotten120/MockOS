@@ -19,3 +19,4 @@ class Process:
 
         self.remaining = burst
         self.prio = prio
+        self.order = None

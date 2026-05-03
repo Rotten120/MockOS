@@ -2,11 +2,11 @@ from src import *
 import asyncio
 
 jobs = [
-    Process("A", burst = 2, arrival = 1),
-    Process("B", burst = 3.5, arrival = 0),
-    Process("C", burst = 1, arrival = 4),
-    Process("D", burst = 1, arrival = 2),
-    Process("E", burst = 3, arrival = 1)
+    Process("A", prio = 0, burst = 2, arrival = 1),
+    Process("B", prio = 1, burst = 3.5, arrival = 0),
+    Process("C", prio = 2, burst = 1, arrival = 4),
+    Process("D", prio = 3, burst = 1, arrival = 2),
+    Process("E", prio = 4, burst = 3, arrival = 1)
 ]
 
 async def main():
@@ -19,9 +19,12 @@ async def main():
     Clock.start()
     await asyncio.gather(
         cpu.run(),
-        csched.run(),
+        csched.run(preempt = True),
         jsched.start()
     )
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("Done")

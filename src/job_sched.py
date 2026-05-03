@@ -14,6 +14,10 @@ class JobScheduler:
 
     async def load(self, job):
         await asyncio.sleep(job.arrival)
-        await self.rq.enqueue(next(JobScheduler.counter), job)
+        
+        order = next(JobScheduler.counter)
+        job.order = order
+
+        await self.rq.enqueue(job)
         print(f"Loaded \"{job.name}\" [{Clock.elapsed()}]")
 
