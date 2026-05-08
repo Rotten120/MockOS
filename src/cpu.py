@@ -14,13 +14,10 @@ class CPU:
     def interrupt(self):
         self.interrupted = True
 
-    def is_interrupted(self):
-        return self.interrupted
-
     async def set_proc_time(self, quantum = None):
-        await asyncio.sleep(quantum or self.job.remaining)
+        burst = min(quantum, self.job.remaining) if quantum else self.job.remaining
+        await asyncio.sleep(burst)
         self.interrupt()
-
 
     def is_idle(self):
         return bool(self.job is None)
@@ -30,7 +27,11 @@ class CPU:
             raise ValueError("CPU is already busy")
         if self.overhead:
             await asyncio.sleep(CPU.sw_time)
+
         self.job = job
+        self.job.last_cpu_in = time.time()
+        self.job.allccnt += 1
+
         print(f"Allocated \"{self.job.name}\" [{Clock.elapsed()}]")
 
     async def dealloc(self):
@@ -39,18 +40,21 @@ class CPU:
         if self.overhead:
             await asyncio.sleep(CPU.sw_time)
 
+        self.job.last_cpu_out = time.time()
+
         if self.job.remaining > 0:
             await self.rq.enqueue(self.job)
-            print(f"Deallocated \"{self.job.name}\" [{Clock.elapsed()}]")
+            print(f" Deallocated \"{self.job.name}\" [{Clock.elapsed()}]")
         else:
-            print(f"Remove \"{self.job.name}\" [{Clock.elapsed()}]")
-        
+            print(f" Remove \"{self.job.name}\" [{Clock.elapsed()}]")
+       
         self.job = None
 
     @clock_sync_loop(interval = 0)
     async def execute(self):
         if self.interrupted:
             raise TimeoutError()
+        # Execute Instructions here
 
     @clock_sync_loop(interval = 0)
     async def run(self, quantum = None):

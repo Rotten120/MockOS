@@ -1,38 +1,38 @@
 from .cpu import CPU
 from .clock import Clock, clock_sync_loop
 import asyncio
+import functools
 
-class ReadyQueue:
+class ReadyQueue(asyncio.PriorityQueue):
     def __init__(self, algo = 0):
-        self.q = asyncio.PriorityQueue()
+        super().__init__()
         self.algo = algo
 
+    @functools.cache
     def normalize(self, job):
+        print(job.name, "normalize")
         if self.algo == 0:
-            return (job.order, job)
+            return (job.allccnt, job.order, job)
         elif self.algo == 1:
             return (job.remaining, job.order, job)
         elif self.algo == 2:
-            return (job.prio, job.order, job.name, job)
+            return (job.prio, job.order, job)
+        elif self.algo == 3:
+            return (job.resp_ratio(), job.order, job)
         raise ValueError("Invalid algo code")
 
     async def enqueue(self, job):
         item = self.normalize(job)
-        await self.q.put(item)
-
-    async def get(self):
-        i_out = await self.q.get()
-        return i_out
-
-    async def put(self, item, **kwargs):
-        await self.q.put(item, **kwargs)
+        await self.put(item)
 
 class CPUScheduler:
     def __init__(self, cpu, rq):
         self.cpu = cpu
         self.rq = rq
 
+    @functools.cache
     def get_prio(self, i1, i2):
+        print(i1[-1].name, i2[-1].name, "prio")
         for n in range(len(i1) - 1):
             if(i1[n] == i2[n]):
                 continue
@@ -55,13 +55,12 @@ class CPUScheduler:
 
         if not self.cpu.is_idle():
             try:
-                qitem = self.rq.q.get_nowait()
+                qitem = self.rq.get_nowait()
+                await self.rq.put(qitem)
             except asyncio.QueueEmpty:
                 return
             
             citem = self.rq.normalize(self.cpu.job)
-            await self.rq.q.put(qitem)
-
             if self.get_prio(citem, qitem):
                 return
             self.cpu.interrupt()

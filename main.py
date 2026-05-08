@@ -9,6 +9,9 @@ jobs = [
     Process("E", prio = 4, burst = 3, arrival = 1)
 ]
 
+# Quantum and preempt cannot have a non-None val
+# and True value simultaneously, respectively
+
 async def main():
     rqueue = ReadyQueue(algo = 1)
 
@@ -18,7 +21,7 @@ async def main():
   
     Clock.start()
     await asyncio.gather(
-        cpu.run(),
+        cpu.run(quantum = None),
         csched.run(preempt = True),
         jsched.start()
     )
